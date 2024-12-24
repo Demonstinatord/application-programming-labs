@@ -1,38 +1,72 @@
-# This is a sample Python script.
+import sys
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QFileDialog, QVBoxLayout, QWidget
+from PyQt5.QtGui import QPixmap
 
-import os
-
-import downloader
-import image_iterator
-import parser
-from annotation_creator import create_annotation
+from iter import ImageIterator
 
 
-def main() -> None:
-    args = parser.get_args()
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()  # Вызов инициализатора класса QMainWindow
+        self.setWindowTitle("Просмотр датасета")
+
+        self.image_label = QLabel(self)  # объект QLabel(приложение графический интерфейса GUI)
+        self.image_label.setFixedSize(800, 600)
+
+        self.next_button = QPushButton("Следующее изображение", self)
+        self.next_button.clicked.connect(self.show_next_image)  # Подключение обработчика события clicked к методу show
+        self.next_button.setEnabled(False)
+        self.open_button = QPushButton("Выбрать папку датасета", self)
+        self.open_button.clicked.connect(self.open_dataset_folder)
+
+        # Создаем вертикальный макет и добавляем в него кнопки
+        layout = QVBoxLayout()
+        layout.addWidget(self.image_label)
+        layout.addWidget(self.next_button)
+        layout.addWidget(self.open_button)
+
+        # Создаем виджет-контейнер и устанавливаем для него макет
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+        self.iterator = None
+
+    def open_dataset_folder(self) -> None:
+        folder_path = QFileDialog.getExistingDirectory(self, "Выберите папку с датасетом")
+        if folder_path:
+            self.iterator = ImageIterator(folder_path=folder_path)
+            self.next_button.setEnabled(True)
+            if len(self.iterator.images) == 0:
+                self.next_button.setEnabled(False)
+                self.image_label.setText("Изображений нет в папке")
+                return None
+            # Открытие изображения сразу
+            next_image_path = next(self.iterator)
+            pixmap = QPixmap(next_image_path)
+            self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=1))
+
+    def show_next_image(self) -> None:
+        if self.iterator and len(self.iterator.images) != 0:
+            try:
+                next_image_path = next(self.iterator)
+                pixmap = QPixmap(next_image_path)  # QPixmap содержит всю информацию о пикселях изображения (их цвет и позицию)
+                self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=1)) # Установка пиксельной карты в окно. aspectRatioMode - сохраняет пропорции
+            except StopIteration:
+                self.next_button.setEnabled(False)
+                self.image_label.setText("Больше изображений нет")
+
+
+def main():
     try:
-        downloader.download_images(args.keyword, args.number, args.imgdir)
-        if len((os.listdir(args.imgdir))) == 0 and args.number != 0:
-            raise FileNotFoundError("can't download images")
-        create_annotation(args.imgdir, args.annotation_file)
-        iterator = image_iterator.ImageIterator(args.annotation_file)
-        for item in iterator:
-            print(item)
+        app = QApplication(sys.argv)
+        window = MainWindow()  # Создаем свой класс
+        window.show()  # Вывод окна на экран
+        sys.exit(app.exec_())  # Устанавливаем закрытие окна только после события нажатия на крестик
 
-    except FileNotFoundError as di:
-        print(f"Something went wrong: {di}")
-
-    except PermissionError as pe:
-        print(f"Something went wrong: {pe} ")
-
-    except StopIteration as si:
-        print(f"Something went wrong: {si} ")
+    except Exception as e:
+        print(f"Произошла ошибка: {e}")
 
 
 if __name__ == "__main__":
     main()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
