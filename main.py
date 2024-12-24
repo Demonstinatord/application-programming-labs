@@ -1,38 +1,70 @@
-# This is a sample Python script.
+import argparse
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import pandas as pd
+import matplotlib.pyplot as plt
 
-import os
-
-import downloader
-import image_iterator
-import parser
-from annotation_creator import create_annotation
+from images_module import add_column_area, add_columns, filter_images
 
 
-def main() -> None:
-    args = parser.get_args()
+def parsing() -> argparse.Namespace:
+    """
+    Парсинг аргументов командной строки
+    """
+    parser = argparse.ArgumentParser(description="Работа с изображением")
+    parser.add_argument('path_to_images_folder', type = str, help='path to folder with images')
+    parser.add_argument('path_to_csv_file', type=str, help='path to the csv file')
+    args = parser.parse_args()
+    return args
+
+
+def create_histogram(column: pd.Series) -> None:
+    """
+    Функция создания гистограммы распределения площадей изображений
+    :param df: pandas DataFrame (object)
+    :return: None
+    """
+    plt.hist(column, bins=10, edgecolor='black')
+    plt.title('Распределение площадей изображений')
+    plt.xlabel('Площадь изображения')
+    plt.ylabel('Количество изображений')
+    plt.show()
+
+
+def main():
+    args = parsing()
     try:
-        downloader.download_images(args.keyword, args.number, args.imgdir)
-        if len((os.listdir(args.imgdir))) == 0 and args.number != 0:
-            raise FileNotFoundError("can't download images")
-        create_annotation(args.imgdir, args.annotation_file)
-        iterator = image_iterator.ImageIterator(args.annotation_file)
-        for item in iterator:
-            print(item)
+        df = pd.read_csv(args.path_to_csv_file)
+        print(df.head())
+        print(df.dtypes)
+        print("DataFrame создан на основе csv-файла\n")
 
-    except FileNotFoundError as di:
-        print(f"Something went wrong: {di}")
+        add_columns(df)
+        print(df.head())
+        print("Колонки width, height, depth добавлены\n")
 
-    except PermissionError as pe:
-        print(f"Something went wrong: {pe} ")
+        stats = df[['height', 'width', 'depth']].describe()
+        print(stats)
+        print("Статистическая информация для столбцов размеров изображения вычислена\n")
+        add_column_area(df)
+        print(df.head())
+        print("Колонка area добавлена\n")
 
-    except StopIteration as si:
-        print(f"Something went wrong: {si} ")
+        filtered_df = filter_images(df, 800, 800)
+        print(filtered_df)
+        print("Отфильтрованный DataFrame Выведен\n")
+
+        df_sort = df.sort_values('area')
+        print(df_sort)
+        print("Сортировка данных по площади изображения\n")
+
+        create_histogram(df['area'])
+        print("Гистограмма выведена")
+        create_histogram(filtered_df['area'])
+        print("Гистограмма выведена")
+
+    except Exception as e:
+        print(f"Произошла ошибка: {e}")
 
 
 if __name__ == "__main__":
     main()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
